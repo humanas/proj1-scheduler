@@ -22,6 +22,7 @@ struct process_t {
 };
 
 typedef struct process_t proc;
+typedef struct process_t pro;
 
 // cria um processo
 proc * createProc(int id, int proctime, int prior) {
