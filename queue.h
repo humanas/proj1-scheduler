@@ -40,6 +40,7 @@ proc * queuePopProcess(queue * q) {
     proc * byebye = q->first;
     if (byebye != NULL) {
         q->first = byebye->next;
+        q->size -= 1;
     }
     return byebye;
 }
@@ -49,3 +50,11 @@ void * queueTranferProcess(queue * q, queue * r) {
     proc * p = queuePopProcess(q);
     queuePushProcess(r, p);
 }
+
+// Verifica se a fila está vazia
+int isEmpty(queue * q) {
+    return !(q->size);
+}
+
+// for que percorre a lista de processos
+#define foreach(p,q) for(proc * p = q->first; p != NULL; p = p->next)

@@ -11,10 +11,21 @@ typedef struct scheduler {
     queue * blocked; // Fila de dispositivos
     queue * finished; // Fila de encerrados
     proc * exec; // Processo em execução
+    int ready_limit;
 } schd;
 
+schd * createScheduler(int ready_limit);
+
+void addProcess(schd * s, proc * p);
+void fillReady(schd * s);
+void blockProcess(schd * s);
+void finishProcess(schd * s);
+void returnToReady(schd * s);
+
+int executeNext(schd * s, int quantum);
+
 // 'Construtor' do escalonador
-schd * createScheduler() {
+schd * createScheduler(int ready_limit) {
     schd * newer = (schd *) malloc (sizeof(schd));
     // Cria as filas
     newer->jobs = createQueue();
@@ -23,7 +34,16 @@ schd * createScheduler() {
     newer->finished = createQueue();
     // Nenhum processo em execução
     newer->exec = NULL;
+    newer->ready_limit = ready_limit;
     return newer;
+}
+
+// Enche a fila de pronto
+void fillReady(schd * s) {
+    while (s->ready->size != s->ready_limit) {
+        queueTranferProcess(s->jobs, s->ready);
+        s->ready->last->state = PROC_STATE_READY;
+    }
 }
 
 // Bloqueia o processo em execução
@@ -49,10 +69,21 @@ void returnToReady(schd * s) {
 
 // Executa o próximo processo da fila de pronto
 int executeNext(schd * s, int quantum) {
-    if (s->exec == NULL) {
+    if (!isEmpty(s->blocked)) {
+        int uninterrupt = yes_or_not();
+        if (uninterrupt) {
+            queueTranferProcess(s->blocked, s->ready);
+            s->ready->last->state = PROC_STATE_READY;
+        }
+    }
+    if (s->exec == NULL && !isEmpty(s->ready)) {
         // Coloca o próximo processo da fila de pronto em execução
         s->exec = queuePopProcess(s->ready);
         s->exec->state = PROC_STATE_EXECUTING;
+        s->exec->counter += 1;
+
+        printf("%d passou pela CPU\n", s->exec->id);
+
 
         // Essa execução será interrompido?
         int interrupt = yes_or_not();
@@ -64,14 +95,21 @@ int executeNext(schd * s, int quantum) {
             // Coloca na fila de dispositivos
             blockProcess(s);
         } else {
+            // O PROCESSO NÃO FOI INTERROMPIDO
             // executa o processo com base no quantum
             s->exec->proctime -= min(quantum, s->exec->proctime);
             // O processo terminou de executar?
             if (s->exec->proctime == 0) {
                 // Finaliza o processo
                 finishProcess(s);
+                // Coloca mais um processo na fila de pronto
+                if (!isEmpty(s->jobs)) {
+                    queueTranferProcess(s->jobs, s->ready);
+                    s->ready->last->state = PROC_STATE_READY;
+                }
             } else {
                 // Recoloca o processo na fila de pronto
+                // quando ele não terminou e nem foi interrompido
                 returnToReady(s);
             }
         }
